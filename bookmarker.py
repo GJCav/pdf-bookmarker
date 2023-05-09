@@ -1,6 +1,17 @@
 from PyPDF2 import PdfFileReader as PReader, PdfFileWriter as PWriter
 
-with open('menu.txt', 'r', encoding='utf-8') as f:
+import argparse
+
+parser = argparse.ArgumentParser(description='Add bookmarks to pdf')
+parser.add_argument('-i', type=str, help='input pdf file', required=True)
+parser.add_argument('-o', type=str, help='output pdf file', default='out.pdf')
+parser.add_argument('-m', type=str, help='menu file')
+parser.add_argument('-f', type=int, help='page offset', required=True)
+
+args = parser.parse_args()
+
+menu_file = args.m
+with open(menu_file, 'r', encoding='utf-8') as f:
     lines = f.readlines()
 
 class Node:
@@ -14,7 +25,7 @@ class Node:
             parent.children.append(self)
         
 root = Node('/docroot',  -1, None)
-hierachy = [[], [], []]
+hierachy = [[], [], [], []]
 
 def tabCount(s):
     cnt = 0
@@ -43,6 +54,9 @@ for l in lines:
     if l == None or not l.strip():
         continue
     lvl = tabCount(l)
+    while len(hierachy) <= lvl:
+        hierachy.append([])
+    
     if lvl == 0:
         title, page = getTitlePage(l)
         hierachy[0].append(Node(title, page, root))
@@ -53,13 +67,13 @@ for l in lines:
 
 
 
-inPDF = PReader('in.pdf')
+inPDF = PReader(args.i)
 pdf = PWriter()
 pdf.cloneDocumentFromReader(inPDF)
 
 print(f'{len(pdf.getObject(pdf._pages)["/Kids"])}')
 
-offset = 16
+offset = args.f
 _lvl = 0
 _parent = None
 def dfsAddBookMark(h: Node):
@@ -75,7 +89,7 @@ def dfsAddBookMark(h: Node):
         _lvl+=1
         _oldPnt = _parent
 
-        if h.page:
+        if h.page is not None:
             print(f'{h.title} --> {h.page+offset}')
             _parent = pdf.addBookmark(h.title, h.page+offset, _parent)
             
@@ -92,5 +106,5 @@ def dfsAddBookMark(h: Node):
 
 dfsAddBookMark(root)
 
-with open('out.pdf', 'wb') as f:
+with open(args.o, 'wb') as f:
     pdf.write(f)
